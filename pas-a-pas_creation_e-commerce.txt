@@ -1,0 +1,388 @@
+**********************************************
+Création de base de boutique e-commerce en PHP
+----------------------------------------------
+==> la base permet de : créer un espace membre, et filtrer ses accès à différentes actions/sections du site, faire du CRUD sur la table produit
+==> des évolutions de la base de code sont à prévoir pour ajouter des fonctionnalité (gestion du statut des membres, page index (=page d'accueil du site), gestion de commande et panier, gestion de nettoyage de fichiers stockés sur le serveur, gestion de l'amélioration expérience utilisateur (ex clear info (ou redirection page?) après avoir modifié un produit?) et sécuriser les informations saisies en BDD (prévoir le cas d'erreur de frappe => une table pour la gestion des catégories plutot qu'une saisie manuelle par ex)
+**********************************************
+
+Résumé d'étapes
+****************
+
+1 - Création de la BDD sur le serveur local (XAMP, MAMP ...)
+	Pour le suivi de ce doc, par exemple on l'appelera : 'site'
+
+2 - Création des tables nécessaires dans la BDD
+	Pour le suivi de ce doc, par exemple, on va créer 2 tables : 'membre' et 'produit'
+	(NB = création des tables 'commande' et 'details_commande' pour la gestion de l'évolution de la base)
+	
+	Propriétés pour les tables :
+		***injection de fichier .sql
+
+3 - Création de l'arborescence de la base de la boutique
+(proposition de lister une vue globale mais de ne faire créer les dossiers/fichiers, seulement quand on les utilise)
+(dossier à creer dans htdocs du serveur local)site
+	(sous-dossier de site)inc
+		(fichier)init.php
+		(fichier)functions.php
+		(fichier)header.php
+		(fichier)footer.php
+	(sous-dossier de site)admin 
+		(fichier)formulaire_produit.php
+		(fichier)gestion_boutique.php
+		(fichier)gestion_membre.php // NB : ce fichier n'est pas utile pour la base de ntore boutique mais pour son évolution
+ 	(sous-dossier de site)photo 
+	(file directement dans le dossier site)connexion.php
+	(file directement dans le dossier site)inscription.php
+	(file directement dans le dossier site)profil.php
+	(file directement dans le dossier site)detail_produit.php 	// NB : ce fichier n'est pas utile pour la base de ntore boutique mais pour son évolution
+	(file directement dans le dossier site)statut.php // NB : ce fichier n'est pas utile pour la base de ntore boutique mais pour son évolution (**??? à quoi cela sert?**)
+	(file directement dans le dossier site)index.php // NB : ce fichier n'est pas utile pour la base de ntore boutique mais pour son évolution // essentiellement de type select ==> page d'accueil du site
+
+
+Cette arborescence de base est amenée à évoluer au fil des étapes de création de notre boutique. Nous allons d'abord créer les éléments nécessaires à la connexion
+(dossier à créer dans htdocs du serveur local)site
+	(sous-dossier de site)inc
+		(fichier)init.php
+		(fichier)functions.php
+		(fichier)header.php
+		(fichier)footer.php
+
+NB : nous utiliserons uniquement bootstrap pour le style. si vous souhaitez mettre une feuille de style elle devra se trouver dans le dossier inc/css
+
+*********************************************************************************
+initialisation des données utiles à toutes les pages // dossier "inc" = inclusion
+*********************************************************************************
+
+4 - Création du fichier init.php 
+on place dans ce fichier un ensemble d'informations qui seront utiles sur chacune de nos pages. ce fichier sera ainsi inclus au début de chacune des pages pour que le code soit accessible sur la page en cours
+	Connexion à la bdd en utilisant PDO ---> ce sera utile pour intéragir avec la bdd
+		$pdo = new PDO('mysql:host=localhost; dbname=site', 'root', '', //possibilité d'ajouter (après dbname), le paramètre 'charset=utf8'
+    			array(
+    				PDO::ATTR_ERRMODE => PDO::ERRMODE_WARNING,
+    				PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8'
+			));
+	lancement session ---> ce sera utile pour la gestion des droits de membre
+			session_start();
+	définition d'une constante pour définir la racine du site ---> ce sera utile pour nos liens dans la barre de navigation
+			define('RACINE_SITE', '/phpp/site/');
+	déclaration d'une variable pour permettre facilement les insertions de messages
+			$contenu = "";
+	inclusion du fichier functions.php ---> ce sera utile pour donner accès sur la page en cours aux fonctions prélablement codées dans le fichier functions.php // en faisant cela on gagne une ligne de code d'inclusion sur chacune de nos pages (on fait du 2 en 1 avec l'inclusion du fichier init.php)
+			require_once 'functions.php';
+
+
+5 - Création du fichier header.php et footer.php
+-------header---------
+	début de code "classique" HTML. mais on va tronquer le bas en enlevant les balises fermantes  qui sont après la nav'. (NB: les balises fermantes seront placées au début du code du fichier footer.php pour reconstituer les 2 parties des balises HTML après inclusion)
+	Utilisation de bootstrap pour la barre de navigation pour aller plus vite dans le cadre de ce projet
+	utilisation de la constante définie dans le fichier 'init.php' dans les liens de la nav. cela permet un changement de nos liens rapidement et une seule action centralisée (=en modifiant la constante) du chemin de la racine du site . cela peut etre utile lors de la mise en ligne du site par ex.
+-------footer---------
+fin du code "classique" HTML. les balises fermantes seront placées au début du code du fichier 'footer.php' . les 2 fichiers ('header.php' et 'footer.php') sont inclus (au bon endroit dans le code) sur les pages à afficher et cela reconstitue les 2 parties des balises HTML
+
+
+6 - Création de la feuille de style (facultatif) 
+nous utiliserons uniquement bootstrap pour le style. si vous souhaitez mettre une feuille de style elle devra se trouver dans le dossier inc/css
+
+
+7 - Création du fichier functions.php
+on vient préparer ici des fonctions qui seront utiles plusieurs fois dans le code. comme le fichier functions.php sera inclus sur les autres pages, les fonctions écrites ici seront reconnues sur la page en cours
+au début on ne va mettre que la fonction debug(). 
+	function debug($variable)
+	{   	echo '<pre>';
+    		print_r($variable);
+    		echo '</pre>';
+	}
+
+NB: nous ajouterons par la suite, les fonctions : executeRequete(), estConnecte(), estAdmin()
+
+**************************
+gestion de l'espace membre
+**************************
+
+8 - Création page inscription.php
+insérer au début de page la page 'init.php' 
+insérer la page 'header.php' après le traitement PHP que nous allons créer, mais avant le début du code HTML (titre, forumlaire etc) 
+insérer la page 'footer.php' en bas de page
+	Création du formulaire html et du traitement php permettant l'insertion en bdd.
+	/!\ dans la page 'functions.php' , créer la fonction executeRequete()
+		function executeRequete($requete, $param = array()){	
+			foreach ($param as $indice => $valeur) {
+        			$param[$indice] = htmlspecialchars($valeur);
+    			} 
+    			global $pdo; 
+    			$resultat = $pdo->prepare($requete);
+    			$succes = $resultat->execute($param);
+			if($succes)
+			{	return $resultat;
+   				}else{
+        			return false;
+    			}
+		}
+
+	dans la page 'inscription.php' , les champs de formulaires devront être controlés. NB : dans un premier temps , ne pas mettre de controle HTLM (ex: pattern, maxlenght) ni de 'required' car cela gênera le debug de notre code. on peut les ajouter une fois que nous avons géré tous les scénarios de situation de bug en PHP. toujours supposer que l'internaute peut faire des erreurs ou tenter des raccourcis (modif url par ex) 
+		if (!empty($_POST)) { // on controle s'il y a envoie de données par le formulaire
+    			if (!isset($_POST['pseudo']) || strlen($_POST['pseudo']) < 4 || strlen($_POST['pseudo']) > 20) {
+        			$contenu .= '<div class="alert alert-danger">Le pseudo doit contenir entre 4 et 20 caractères</div>';
+    				} // on controle si le champs pseudo est saisi avec les contraintes qu'on souhaite.
+			// on ajoute autant de formule de controle que de champs de formulaire à border à la saisie
+		}
+
+
+	Contrôle pseudo n'existe pas déjà en bdd. on va utiliser une requête préparée, pour faire ce controle. Le mot de passe devra être hashé avec la fonction password_hash().
+		if (empty($contenu)) {
+        		$resultat = executeRequete("SELECT * FROM membre WHERE pseudo = :pseudo", array(':pseudo' => $_POST['pseudo']));
+        		if ($resultat->rowCount() > 0) {
+            		$contenu .= '<div>Le pseudo existe déjà. Veuillez en choisir un autre</div>';
+        			} else {
+            			$mdp = password_hash($_POST['mdp'], PASSWORD_DEFAULT);
+            		$succes = executeRequete(
+                		"INSERT INTO membre(pseudo, mdp, nom, prenom, email, civilite, ville, code_postal, adresse, statut) VALUES (:pseudo, :mdp, :nom, :prenom, :email, :civilite, :ville, :code_postal, :adresse, :statut)",
+                		array(
+                    			':pseudo' => $_POST['pseudo'],
+                    			':mdp' => $mdp,
+                    			':nom' => $_POST['nom'],
+                    			':prenom' => $_POST['prenom'],
+                    			':email' => $_POST['email'],
+                    			':civilite' => $_POST['civilite'],
+                    			':ville' => $_POST['ville'],
+                    			':code_postal' => $_POST['code_postal'],
+                    			':adresse' => $_POST['adresse'],
+                    			':statut' => 0 // 0 pour les membres classiques (non admin)
+                		)
+            		);
+            	if($succes){
+                	$contenu .='<div class="alert alert-success">Vous êtes inscrit. Pour vous connecter <a href="connexion.php">cliquez ici</a></div>';
+            		}else{
+                		$contenu .= '<div class="alert alert-danger">Une erreur est survenue ...</div>';
+            		}
+        		}
+    		}
+		
+
+9 - Création page connexion.php
+insérer au début de page la page 'init.php' 
+insérer la page 'header.php' après le traitement PHP que nous allons créer, mais avant le début du code HTML (titre, forumlaire etc) 
+insérer la page 'footer.php' en bas de page
+	Création du formulaire html et du traitement php permettant de vérifier si le pseudo et mdp existe en bdd (vous utiliserez password_verify() )
+	/!\ dans la page 'functions.php' , créer la fonction 'estConnecte()' 
+		function estConnecte(){
+   			if(isset($_SESSION['membre'])){
+        		return true;
+    			}else{
+        		return false;
+    			}
+		}
+	Sur la page 'connexion.php' , gérer la redirection vers 'profil.php' si estConnecte() 
+		if(estConnecte()){
+    			header('location:profil.php');
+    			exit;
+		}
+	Sur la page 'connexion.php' , gérer la déconnection de l'internaute. /!\ la data de $_GET['action'] provient du clic sur le lien 'deconnexion' qu'on a ajouté sur la page 'header.php' (voir point 10 - mise à jour du header)
+		if(isset($_GET['action']) && $_GET['action'] == 'deconnexion'){
+    			unset($_SESSION['membre']);
+    			$message = '<div class="alert alert-info">Vous êtes déconnecté</div>';
+		}
+
+10 - Mise à jour du header
+gérer l'affichage de page selon la connexion ou non de l'internaute
+ 		<?php if (estConnecte()) { ?>
+            	<li class="nav-item">
+                  	<a class="nav-link active" aria-current="page" href="<?= RACINE_SITE ?>profil.php">Profil</a>
+     			</li>
+         		<li class="nav-item">
+            		<a class="nav-link active" aria-current="page" href="<?= RACINE_SITE ?>connexion.php?action=deconnexion">Déconnexion</a>
+           	</li>
+    		<?php } else { ?>
+          		<li class="nav-item">
+          			<a class="nav-link active" aria-current="page" href="<?= RACINE_SITE ?>inscription.php">Inscription</a>
+           	</li>
+        		<li class="nav-item">
+      			<a class="nav-link active" aria-current="page" href="<?= RACINE_SITE ?>connexion.php">Connexion</a>
+         		</li>
+ 		<?php }?>
+
+11 - Création page profil.php
+insérer au début de page la page 'init.php' 
+insérer la page 'header.php' après le traitement PHP que nous allons créer, mais avant le début du code HTML (titre, forumlaire etc) 
+insérer la page 'footer.php' en bas de page
+Gérer les redirections si profil non connecté 
+Faire un affichage des coordonnées du profil connecté
+dans le HTML : 
+<h2>Bonjour <?= $_SESSION['membre']['prenom'] .' '. $_SESSION['membre']['nom'] ?></h2>
+<h3>Vos informations</h3>
+<ul>
+    <li>Email : <?= $_SESSION['membre']['email']?></li>
+    <li>Adresse : <?= $_SESSION['membre']['adresse']?></li>
+    <li>Code postal : <?= $_SESSION['membre']['code_postal']?></li>
+    <li>Ville : <?= $_SESSION['membre']['ville']?></li>
+</ul>
+
+
+NB : évolutions des fonctionnalités pour gérer les membres ==> à prévoir sur une page gestion_membre.php en accès par l'admin uniquement. permettrait action modif pour deblocage accès?
+
+*************************
+gestion des produits CRUD
+*************************
+
+12 - création du profil admin et suites
+on ne va donner l'accès à la création de produit qu'à notre admin. il faut donc le créer et gérer ses accès
+faire la modif de la BDD via phpMyAdmin pour changer le statut d'un membre crée pour les tests.
+/!\ dans la page 'functions.php' , créer la fonction 'estAdmin()' 
+	function estAdmin(){
+		if (estConnecte() && $_SESSION['membre']['statut'] == 1) {
+			return true;
+		}else{
+			return false;
+	} 
+	}
+Mise à jour du 'header.php' pour gérer l'affichage de page selon la connexion ou non de l'admin
+	<?php
+	if (estAdmin()) { ?>
+        <li class="nav-item">
+            <a class="nav-link" href="<?= RACINE_SITE ?>admin/gestion_boutique.php">Gestion de la boutique</a>
+        </li>
+    <?php } ?>
+
+13 - Création de la page 'formulaire_produits.php'
+-------créer---------
+insertion 'init.php', 'header.php' et 'footer.php' /!\ au chemin s'il y a des dossiers (ici penser à sortir du dossier admin avec '../' et bien lister les dossiers dans lesquels entrer ensuite '../inc/init.php' pour sortir de 'admin' et accéder au fichier 'init.php' qui est dans le dossier 'inc')
+Controle si estAdmin sinon redirection vers le formulaire d'authentification
+	if (!estAdmin()) {
+		header('location:../connexion.php');
+		exit;
+	}
+Creation du formulaire HTML qui servira d'abord pour l'insertion de nouveau produits et le traitement PHP permettant d'insérer. /!\ bien penser à ajouter dans la balise <form> l'attribut enctype="multipart/form-data" pour pouvoir gérer le chargement d'un fichier (ici la photo)
+*
+*formulaire HTML
+*
+*
+
+
+NB : on fera évoluer ensuite le formulaire HTML pour permettre aussi la modification de produits et le traitement PHP pour modifier
+requete INSERT INTO sur le page 'formulaire_produit.php' /!\ on doit aussi gérer l'insertion et affichage de la photo
+	if (!empty($_POST)) {	
+		$photo_bdd = '';
+
+	    if (!empty($_FILES['photo']['name'])) { 
+        $nom_fichier = $_FILES['photo']['name']; 
+        $photo_bdd = 'photo/' . $nom_fichier;
+        copy($_FILES['photo']['tmp_name'], '../' . $photo_bdd);
+    	}
+	
+		$succes = executeRequete("INSERT INTO produit (reference, categorie, titre, description, couleur, taille, public, photo, prix, stock) VALUES (:reference, :categorie, :titre, :description, :couleur, :taille, :public, :photo, :prix, :stock)", array(
+			':reference' => $_POST['reference'],
+			':categorie' => $_POST['categorie'],
+			':titre' => $_POST['titre'],
+			':description' => $_POST['description'],
+			':couleur' => $_POST['couleur'],
+			':taille' => $_POST['taille'],
+			':public' => $_POST['public'],
+			':photo' => $photo_bdd, // chemin de la photo uploadée qui est vide par défaut
+			':prix' => $_POST['prix'],
+			':stock' => $_POST['stock']
+		));
+		if ($succes) {
+			$contenu .= '<div class="alert alert-success">Le produit a été ajouté</div>';
+		} else {
+			$contenu .= '<div class="alert alert-danger">Une erreur est survenue ...</div>';
+		}
+	}
+
+
+14 - Création gestion_boutique.php
+-------afficher---------
+Afficher la liste des produits dans une table et un bouton pour insérer un produit
+	$resultat = executeRequete("SELECT * FROM produit"); // on sélectionne tous les produits
+
+	$contenu .= '<a class="btn btn-primary mt-2 mb-2" href="formulaire_produit.php">Ajouter un produit</a>';
+
+	$contenu .= '<table class="table">';
+	$contenu .= '<tr>';
+	$contenu .= '<th>ID</th>';
+	$contenu .= '<th>Référence</th>';
+	$contenu .= '<th>Catégorie</th>';
+	$contenu .= '<th>Titre</th>';
+	$contenu .= '<th>Description</th>';
+	$contenu .= '<th>Couleur</th>';
+	$contenu .= '<th>Taille</th>';
+	$contenu .= '<th>Public</th>';
+	$contenu .= '<th>Photo</th>';
+	$contenu .= '<th>Prix</th>';
+	$contenu .= '<th>Stock</th>';
+	$contenu .= '<th>Actions</th>'; // colonne pour les liens "modifier et supprimer" qui seront crées après
+	$contenu .= '</tr>';
+
+	while ($produit = $resultat->fetch(PDO::FETCH_ASSOC)) { 
+		$contenu .= '<tr>'; 
+		foreach ($produit as $indice => $information) { 
+			if ($indice == 'photo') { /
+				$contenu .= '<td><img style="width:90px" src="../' . $information . '"</td>'; 
+			} else { 
+				$contenu .= '<td>' . $information . '</td>';
+			}
+		}
+
+		$contenu .= '</tr>';
+	}
+	$contenu .= '</table>';
+
+puis ajouter 2 boutons qui permettront au clic d'envoyer des infos pour gérer les actions de Supprimer ou Modifier. les placer dans la boucle while, avant l'insertion de fermeture </tr> pour que chaque ligne de produit ait les 2 boutons
+    $contenu .= '<td>   
+					<a href="#" class="btn btn-primary">Modifier</a>
+    				<a href="#" class="btn btn-danger">Supprimer</a>
+                </td>';
+
+15 - Supprimer et modifier des produits
+-------supprimer---------
+requete DELETE FROM sur la page 'gestion_boutique.php'
+pour que la requete fonctionne, il faut récupérer l'id_produit concerné par la suppression. pour cela on modifie le bouton (sur la même page) en ajoutant l'action au clic de 'get' l'id_produit (on envoie donc à travers l'url une information)
+    <a href="?id_produit=' . $produit['id_produit'] . '" class="btn btn-danger">Supprimer</a>
+
+//ajouter une action dans l'url : action=delete//
+
+-------modifier----------
+modification de la requete INSERT INTO en REPLACE INTO
+ajouter les champs id_produit , :id_produit à la requete, et ajouter la ligne pour l'association (array)
+ajouter un champs caché dans le formulaire pour récupérer en 'post' l'info de l'id_produit
+	<input type="hidden" name="id_produit" value="<?php echo $produit['id_produit'] ?? 0; ?>">
+ajouter une formule pour alimenter une variable qui sera récupérée dans le formulaire.
+	if (isset($_GET['id_produit'])) { 
+		$resultat = executeRequete("SELECT * FROM produit WHERE id_produit = :id_produit", array(':id_produit' => $_GET['id_produit']));
+		$produit = $resultat->fetch(PDO::FETCH_ASSOC);
+	}
+cette variable est alimentée avec le 'get' généré par le clic sur le bouton "modifier" sur la page gestion_boutique. 
+mise à jour du bouton 'modifier" : 
+	<a href="formulaire_produit.php?id_produit=' . $produit['id_produit'] . '" class="btn btn-primary">Modifier</a>
+) 
+
+
+/!\ pour gérer les fichiers photos lors de la modification d'un produit. Meme s'il n'y a pas de changement de photo, il faut penser à gérer le renvoie du chemin vers la photo qui est déjà en BDD, car si on n'indique rien, le chemin vers la photo sera envoyé à 'vide' et écrasera le précédent chemin.
+on passe par une variable de transition $photo_actuelle qui est alimentée via le champs de formulaire HTML caché. ainsi en modification de produit, $photo_bdd ne sera jamais vide (sauf s'il était déjà vide avant modification et qu'on ne modifie pas la photo). il contiendra soit le chemin vers la nouvelle photo (cas de modification de la photo), soit le chemin vers la photo déjà en BDD
+dans le traitement PHP
+    if (isset($_POST['photo_actuelle'])) { 
+        $photo_bdd = $_POST['photo_actuelle']; 
+    }
+
+dans le formulaire HTML
+<?php
+    if (isset($produit['photo'])) { 
+        echo '<div>Photo actuelle du produit</div>';
+        echo '<div><img style="width:90px;" src="../' . $produit['photo'] . '"></div>'; 
+        echo '<input type="hidden" name="photo_actuelle" value="' . $produit['photo'] . '">'; 
+    }
+    ?>
+
+
+/!\ gérer le remplissage du formulaire du produit à modifier avec les précédentes données
+ajouter sur tous les champs du formulaire HTML un attribut pour récéupérer l'id_produit
+	ex pour le champs Référence ==> à adapter et à appliquer pour tous les champs du formulaire sans particularité
+		value="<?php echo $produit['reference'] ?? ''; ?>"
+
+/!\ particularité pour récupérer les infos de 
+	textarea car pas de value donc on met le code ci-après entre les balises > **ICI** < : 
+		<?php echo $produit['description'] ?? ''; ?>
+	select 
+		<?php if (isset($produit['taille']) && $produit['taille'] == 'M') echo 'selected'; ?>
+	radio
+		<?php if (isset($produit['public']) && $produit['public'] == 'm') echo 'checked'; ?>
+
